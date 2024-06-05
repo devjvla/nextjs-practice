@@ -1,18 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
+import schema from "./schema";
+import prisma from "@/prisma/client";
 
-export function GET(request: NextRequest) {
-    return NextResponse.json([
-        { id: 1, firstName: "Kobe", lastName: "Bryant" },
-        { id: 2, firstName: "Dwyane", lastName: "Wade" },
-        { id: 3, firstName: "Stephen", lastName: "Curry" },
-    ]);
+export async function GET(request: NextRequest) {
+	let response_data = { result: {}, status: 400 };
+
+	try {
+		const users = await prisma.user.findMany();
+		
+		response_data.result = { ...users };
+		response_data.status = 200;
+	} catch (error) {
+		response_data.result = { "message": "An error occured" };
+	}
+
+	return NextResponse.json(response_data.result, { status: response_data.status });
 }
 
 export async function POST(request: NextRequest) {
-    const req_body = await request.json();
+	let response_data = { result: {}, status: 400 };
 
-    if(!req_body.firstName || !req_body.lastName)
-        return NextResponse.json({ 'error': 'Missing required fields!' }, { status: 400 });
+	try {
+		const { firstName, lastName, email, password } = await request.json();
 
-    return NextResponse.json({ id: 1, ...req_body }, { status: 201 });
+		// Validate request body
+		const validate = schema.safeParse({ firstName, lastName, email, password });
+
+		if(!validate.success){
+			throw new Error("Invalid fields");
+		}
+
+		// Check if email is already in the database
+		const check_email = await prisma.user.findUnique({ where: { email } });
+
+		if(check_email) {
+			throw new Error("Cannot create User record because Email is already registered");
+		}
+
+		// Create new User record
+		const create_user = await prisma.user.create({
+			data: { firstName, lastName, email, password }
+		});
+
+		response_data.result = { ...create_user };
+		response_data.status = 200;
+	} catch (error) {
+		response_data.result = { "message": "An error occured" };
+		
+		if (error instanceof Error) {
+			response_data.result = { "message": error.message };
+		}
+	}
+
+	return NextResponse.json(response_data.result, { status: response_data.status });
 }
