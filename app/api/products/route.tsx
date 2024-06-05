@@ -1,42 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import schema from "./schema";
+import prisma from "@/prisma/client";
 
-interface Product {
-    id: number;
-    name: string;
-    price: number;
-}
+export async function GET(request: NextRequest) {
+	let response_data = { result: {}, status: 400 };
 
-const SAMPLE_PRODUCTS_JSON: Product[] = [
-    {
-        id: 1,
-        name: "Milk",
-        price: 169
-    },
-    {
-        id: 2,
-        name: "Eggs",
-        price: 59.50
-    },
-    {
-        id: 3,
-        name: "Coffee",
-        price: 319.50
-    }
-];
+	try {
+		const products = await prisma.product.findMany();
+		
+		response_data.result = { ...products };
+		response_data.status = 200;
+	} catch (error) {
+		response_data.result = { "message": "An error occured" };
+	}
 
-export function GET(request: NextRequest) {
-    return NextResponse.json(SAMPLE_PRODUCTS_JSON);
+	return NextResponse.json(response_data.result, { status: response_data.status });
 }
 
 export async function POST(request: NextRequest) {
-    const { name, price }: Product = await request.json();
-    const validation = schema.safeParse({ name, price });
+    let response_data = { result: {}, status: 400 };
 
-    if(!validation.success)
-        return NextResponse.json(validation.error.errors, { status: 400 });
+	try {
+		const { name, cost, quantity } = await request.json();
 
-    SAMPLE_PRODUCTS_JSON.push({ id: SAMPLE_PRODUCTS_JSON.length + 1, name, price });
+		// Validate request body
+		const validate = schema.safeParse({ name, cost, quantity });
 
-    return NextResponse.json({ ...SAMPLE_PRODUCTS_JSON[SAMPLE_PRODUCTS_JSON.length - 1] }, { status: 201 });
+		if(!validate.success){
+			throw new Error("Invalid fields");
+		}
+
+		// Create new Product record
+		const create_product = await prisma.product.create({
+			data: { name, cost, quantity }
+		});
+
+		response_data.result = { ...create_product };
+		response_data.status = 200;
+	} catch (error) {
+		response_data.result = { "message": "An error occured" };
+		
+		if (error instanceof Error) {
+			response_data.result = { "message": error.message };
+		}
+	}
+
+	return NextResponse.json(response_data.result, { status: response_data.status });
 }

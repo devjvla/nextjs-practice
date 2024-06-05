@@ -1,63 +1,98 @@
-import { error } from "console";
 import { NextRequest, NextResponse } from "next/server";
+import schema from "../schema";
+import prisma from "@/prisma/client";
 
-interface Product {
-    id: number;
-    name: string;
-    price: number;
+
+export async function GET(request: NextRequest, { params }: { params: { id: string} }) {
+    let response_data = { result: {}, status: 400 };
+
+	try {
+		const product = await prisma.product.findUnique({
+			where: { id: parseInt(params.id) }
+		});
+
+		if(!product) {
+            response_data.status = 404;
+			throw new Error("Product not found.");
+		}
+
+		response_data.result = { ...product };
+		response_data.status = 200;
+	} catch (error) {
+		response_data.result = { "message": "An error occured" };
+		
+		if (error instanceof Error) {
+			response_data.result = { "message": error.message };
+		}
+	}
+
+	return NextResponse.json(response_data.result, { status: response_data.status });
 }
 
-const SAMPLE_PRODUCTS_JSON: Product[] = [
-    {
-        id: 1,
-        name: "Milk",
-        price: 169
-    },
-    {
-        id: 2,
-        name: "Eggs",
-        price: 59.50
-    },
-    {
-        id: 3,
-        name: "Coffee",
-        price: 319.50
-    }
-];
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+    let response_data = { result: {}, status: 400 };
 
-export function GET(request: NextRequest, { params }: { params: { id: number} }) {
-    const [product] = SAMPLE_PRODUCTS_JSON.filter(product => product.id == params.id );
+	try {
+		const { name, cost, quantity } = await request.json();
+	
+		// Validate request body
+		const validate = schema.safeParse({ name, cost, quantity });
 
-    if(!product)
-        return NextResponse.json({ error: "Product is not found" }, { status: 404 });
+		if(!validate.success){
+			throw new Error("Invalid fields.");
+		}
+		
+		// Check if Product exists
+		const check_product = await prisma.product.findUnique({ where: { id: parseInt(params.id) } });
 
-    return NextResponse.json(product);
+		if(!check_product) {
+			response_data.status = 404;
+			throw new Error("Prodcut not found.");
+		}
+	
+		// Update Product record
+		const update_product = await prisma.product.update({
+			data: { name, cost, quantity }, 
+			where: { id: parseInt(params.id) }
+		});
+
+		response_data.result = { ...update_product };
+		response_data.status = 200;
+	} catch (error) {
+		response_data.result = { "message": "An error occured" };
+		
+		if (error instanceof Error) {
+			response_data.result = { "message": error.message };
+		}
+	}
+
+	return NextResponse.json(response_data.result, { status: response_data.status });
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: number } }) {
-    const req_body = await request.json();
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+    let response_data = { result: {}, status: 400 };
 
-    if(!Object.keys(req_body).length)
-        return NextResponse.json({ "error": "Missing required fields" }, { status: 400 });
-    
-    const product = await fetch(`http://localhost:3000/api/products/${params.id}`);
-    const product_data = await product.json();
+	try {
+		// Check if Product exists
+		const check_product = await prisma.product.findUnique({ where: { id: parseInt(params.id) } });
 
-    if(product_data.error)
-        return NextResponse.json(product_data, { status: 404 });
+		if(!check_product) {
+			response_data.status = 404;
+			throw new Error("Product not found.");
+		}
+	
+		// Delete Product record
+		await prisma.product.delete({ where: { id: parseInt(params.id) } });
 
-    return NextResponse.json({ ...product_data, ...req_body });
-}
+		response_data.result = { "message": "Product record has been deleted" };
+		response_data.status = 200;
+	} catch (error) {
+		response_data.result = { "message": "An error occured" };
+		
+		if (error instanceof Error) {
+			response_data.result = { "message": error.message };
+		}
+	}
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: number } }) {
-    const product = await fetch(`http://localhost:3000/api/products/${params.id}`);
-    const product_data = await product.json();
-
-    if(product_data.error)
-        return NextResponse.json(product_data, { status: 404 });
-    
-    let index = SAMPLE_PRODUCTS_JSON.findIndex(product => product.id == params.id);
-    SAMPLE_PRODUCTS_JSON.splice(index, 1);
-
-    return NextResponse.json({ "message": "Product is successfully deleted." });
+	return NextResponse.json(response_data.result, { status: response_data.status });
 }

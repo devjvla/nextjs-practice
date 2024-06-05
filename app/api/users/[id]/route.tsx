@@ -11,6 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 		});
 
 		if(!user) {
+			response_data.status = 404;
 			throw new Error("User not found.");
 		}
 
@@ -44,6 +45,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 		const check_user = await prisma.user.findUnique({ where: { id: parseInt(params.id) } });
 
 		if(!check_user) {
+			response_data.status = 404;
 			throw new Error("User not found.");
 		}
 	
@@ -74,6 +76,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 		const check_user = await prisma.user.findUnique({ where: { id: parseInt(params.id) } });
 
 		if(!check_user) {
+			response_data.status = 404;
 			throw new Error("User not found.");
 		}
 	

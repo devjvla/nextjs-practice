@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
 		const check_email = await prisma.user.findUnique({ where: { email } });
 
 		if(check_email) {
+			response_data.status = 201;
 			throw new Error("Cannot create User record because Email is already registered");
 		}
 
